@@ -89,17 +89,90 @@ class EgocentricEncoder(BaseStateEncoder):
 
 # Hand-crafted features
 class FeatureVectorEncoder(BaseStateEncoder):
+    """
+    FeatureVectorEncoder encodes the game state as a compact hand-crafted feature vector.
+
+    This encoder extracts ten scalar features from the raw observation and info dict,
+    capturing the information most relevant for navigation: proximity and direction to
+    food, and immediate collision danger in each cardinal direction.
+
+    The ten features are, in order:
+        dx_to_food   : signed normalized x-distance to food, in [-1, 1]
+        dy_to_food   : signed normalized y-distance to food, in [-1, 1]
+        danger_up    : 1 if the cell directly above the head is a wall or body segment
+        danger_down  : 1 if the cell directly below the head is a wall or body segment
+        danger_left  : 1 if the cell directly left of the head is a wall or body segment
+        danger_right : 1 if the cell directly right of the head is a wall or body segment
+        food_up      : 1 if the food is strictly above the head
+        food_down    : 1 if the food is strictly below the head
+        food_left    : 1 if the food is strictly to the left of the head
+        food_right   : 1 if the food is strictly to the right of the head
+
+    Attributes:
+        observation_space (gym.spaces.Box): The observation space of shape (10,)
+            with values normalized between -1 and 1 as float32.
+
+    Methods:
+        encode(obs, info): Extracts the feature vector from the raw observation and info dict.
+    """
+
     def __init__(self):
         super().__init__()
         self.observation_space = gym.spaces.Box(
             low=-1,
             high=1,
-            shape=(10,),  # example feature size
+            shape=(10,),
             dtype=np.float32,
         )
 
     def encode(self, obs, info):
-        pass  # Implement feature extraction (e.g., distance to food, direction to food, etc.)
+        grid_size = obs.shape[0]
+        head = info.get("head", (grid_size // 2, grid_size // 2))
+        food = info.get("food", (0, 0))
+
+        hx, hy = head
+        fx, fy = food
+
+        # Signed normalized distances to food along each axis, in [-1, 1]
+        dx_to_food = (fx - hx) / (grid_size - 1)
+        dy_to_food = (fy - hy) / (grid_size - 1)
+
+        # A cell is dangerous if it is out of bounds or occupied by a body segment.
+        # Channel 1 marks all occupied blocks; channel 2 marks the food cell only.
+        # A body-occupied cell satisfies obs[nx, ny, 1] == 1 and obs[nx, ny, 2] == 0.
+        def is_dangerous(nx, ny):
+            if nx < 0 or nx >= grid_size or ny < 0 or ny >= grid_size:
+                return 1.0
+            if obs[nx, ny, 1] == 1 and obs[nx, ny, 2] == 0:
+                return 1.0
+            return 0.0
+
+        danger_up = is_dangerous(hx, hy - 1)
+        danger_down = is_dangerous(hx, hy + 1)
+        danger_left = is_dangerous(hx - 1, hy)
+        danger_right = is_dangerous(hx + 1, hy)
+
+        # Binary indicators for the relative position of food
+        food_up = 1.0 if fy < hy else 0.0
+        food_down = 1.0 if fy > hy else 0.0
+        food_left = 1.0 if fx < hx else 0.0
+        food_right = 1.0 if fx > hx else 0.0
+
+        return np.array(
+            [
+                dx_to_food,
+                dy_to_food,
+                danger_up,
+                danger_down,
+                danger_left,
+                danger_right,
+                food_up,
+                food_down,
+                food_left,
+                food_right,
+            ],
+            dtype=np.float32,
+        )
 
 
 class CnnGridEncoder(BaseStateEncoder):
