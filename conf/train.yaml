@@ -3,15 +3,24 @@ defaults:
   - agent: random
   - encoder: full
   - reward: id
-  
+
+### Env Params ###
+fps: 60
+max_step: 500
+init_length: 4
+food_reward: 2.0
+dist_reward: null
+living_bonus: 0.0
+death_penalty: -1.0
+width: 20
+height: 20
+block_size: 20
+
 episodes: 1000
+episode_max_iterations: null
 log_every: 10
 seed: null
 save:
   enabled: false
   path: models/agent.pkl
 
-
-hydra:  
-  run:  
-    dir: ./logs/${agent}_${encoder}

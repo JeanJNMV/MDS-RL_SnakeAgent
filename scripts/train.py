@@ -1,27 +1,26 @@
 import logging
 
-import gymnasium as gym
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
 from rl_snake.agents import BaseAgent
+from rl_snake.env import SnakeEnv
 from rl_snake.rewards import BaseReward
-from rl_snake.spaces import BaseStateEncoder
+from rl_snake.states import BaseStateEncoder
 
 logger = logging.getLogger(__name__)
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="train")
 def main(cfg: DictConfig) -> None:
-    log_level = cfg.get("log_level", "INFO")
     logging.basicConfig(
-        level=getattr(logging, str(log_level).upper()),
+        level=logging.INFO,
         format="%(message)s",
         force=True,
     )
 
-    env = gym.make("Snake-v1")
+    env = SnakeEnv()
 
     agent: BaseAgent = instantiate(cfg.agent)
     encoder: BaseStateEncoder = instantiate(cfg.encoder)
@@ -32,54 +31,19 @@ def main(cfg: DictConfig) -> None:
     episode_lengths = []
 
     for episode in range(cfg.episodes):
-        if cfg.seed is None:
-            obs, info = env.reset()
-        else:
-            obs, info = env.reset(seed=cfg.seed + episode)
+        episode_seed = None if cfg.seed is None else cfg.seed + episode
+        stats = env.run_episode(
+            agent=agent,
+            encoder=encoder,
+            reward_wrapper=reward_wrapper,
+            seed=episode_seed,
+            train=True,
+            max_iterations=cfg.get("episode_max_iterations", None),
+        )
 
-        reward_wrapper.reset()
-
-        state = encoder.encode(obs, info)
-
-        done = False
-        shaped_episode_reward = 0.0
-        raw_episode_reward = 0.0
-        steps = 0
-
-        while not done:
-            action = agent.choose_action(state)
-
-            next_obs, raw_reward, terminated, truncated, next_info = env.step(action)
-            next_state = encoder.encode(next_obs, next_info)
-
-            shaped_reward = reward_wrapper.compute(
-                state=state,
-                action=action,
-                next_state=next_state,
-                raw_reward=raw_reward,
-                terminated=terminated,
-                truncated=truncated,
-                info=next_info,
-            )
-
-            done = terminated or truncated
-
-            agent.update(
-                state=state,
-                action=action,
-                reward=shaped_reward,
-                next_state=next_state,
-                done=done,
-            )
-
-            state = next_state
-            shaped_episode_reward += float(shaped_reward)
-            raw_episode_reward += float(raw_reward)
-            steps += 1
-
-        shaped_episode_rewards.append(shaped_episode_reward)
-        raw_episode_rewards.append(raw_episode_reward)
-        episode_lengths.append(steps)
+        shaped_episode_rewards.append(stats.shaped_return)
+        raw_episode_rewards.append(stats.raw_return)
+        episode_lengths.append(stats.steps)
 
         if (episode + 1) % cfg.log_every == 0:
             mean_shaped_reward = (

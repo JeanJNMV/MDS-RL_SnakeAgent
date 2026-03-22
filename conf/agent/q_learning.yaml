@@ -1,0 +1,9 @@
+_target_ : rl_snake.agents.QLearningAgent
+n_actions: 4
+alpha: 0.1
+gamma: 0.99
+epsilon: 1.0
+epsilon_min: 0.05
+epsilon_decay: 0.995
+state_round_decimals: 4
+seed: null

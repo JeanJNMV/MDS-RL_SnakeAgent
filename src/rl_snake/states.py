@@ -7,7 +7,7 @@ class BaseStateEncoder:
     def __init__(self):
         self.observation_space = None
 
-    def encode(self, obs, info):
+    def encode(self, obs: np.ndarray, info: dict):
         raise NotImplementedError
 
 
@@ -24,6 +24,23 @@ class FullGridEncoder(BaseStateEncoder):
 
     def encode(self, obs, info):
         return obs.flatten().astype(np.float32)
+
+
+class HeadFoodEncoder(BaseStateEncoder):
+    def encode(self, obs: np.ndarray, info: dict):
+        height, width = obs.shape[:2]
+        default_head = (height // 2, width // 2)
+        default_food = (0, 0)
+
+        head = info.get("head", default_head)
+        food = info.get("food", default_food)
+
+        head_r = float(np.clip(head[0], 0, height - 1)) / max(height - 1, 1)
+        head_c = float(np.clip(head[1], 0, width - 1)) / max(width - 1, 1)
+        food_r = float(np.clip(food[0], 0, height - 1)) / max(height - 1, 1)
+        food_c = float(np.clip(food[1], 0, width - 1)) / max(width - 1, 1)
+
+        return np.array([head_r, head_c, food_r, food_c], dtype=np.float32)
 
 
 # # Egocentric representation

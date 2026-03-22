@@ -1,1 +1,1 @@
-_target_ : rl_snake.spaces.FullGridEncoder
+_target_ : rl_snake.states.FullGridEncoder

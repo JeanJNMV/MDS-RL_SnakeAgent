@@ -1,52 +1,37 @@
-import gymnasium as gym
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
 from rl_snake.agents import BaseAgent
+from rl_snake.env import SnakeEnv
 from rl_snake.rewards import BaseReward
-from rl_snake.spaces import BaseStateEncoder
+from rl_snake.states import BaseStateEncoder
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="test")
 def main(cfg: DictConfig) -> None:
-    env = gym.make("Snake-v1", render_mode="human", fps=cfg.fps)
+    env = SnakeEnv(render_mode="human", **cfg.env_params)
 
     agent: BaseAgent = instantiate(cfg.agent)
     encoder: BaseStateEncoder = instantiate(cfg.encoder)
     reward_wrapper: BaseReward = instantiate(cfg.reward)
+    stats = env.run_episode(
+        agent=agent,
+        encoder=encoder,
+        reward_wrapper=reward_wrapper,
+        seed=cfg.get("seed", None),
+        train=False,
+        max_iterations=cfg.get("episode_max_iterations", None),
+    )
 
-    obs, info = env.reset()
-    state = encoder.encode(obs, info)
-
-    done = False
-    while not done:
-        action = agent.choose_action(state)
-
-        next_obs, raw_reward, terminated, truncated, next_info = env.step(action)
-
-        next_state = encoder.encode(next_obs, next_info)
-        shaped_reward = reward_wrapper.compute(
-            state=state,
-            action=action,
-            next_state=next_state,
-            raw_reward=raw_reward,
-            terminated=terminated,
-            truncated=truncated,
-            info=next_info,
-        )
-
-        done = terminated or truncated
-
-        agent.update(
-            state=state,
-            action=action,
-            reward=shaped_reward,
-            next_state=next_state,
-            done=done,
-        )
-
-        state = next_state
+    print(
+        f"Test episode complete | "
+        f"Raw Reward: {stats.raw_return:8.3f} | "
+        f"Shaped Reward: {stats.shaped_return:8.3f} | "
+        f"Steps: {stats.steps} | "
+        f"Iteration Limit Reached: {stats.iteration_limit_reached}",
+    )
+    env.close()
 
 
 if __name__ == "__main__":
