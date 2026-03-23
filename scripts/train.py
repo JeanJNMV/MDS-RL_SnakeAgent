@@ -67,9 +67,9 @@ def main(cfg: DictConfig) -> None:
             wandb_run.log(metrics)
 
     if cfg.save.enabled:
-        save_path = "models" / Path(cfg.save.path).with_suffix(".pkl")
+        save_path = Path("models") / Path(cfg.save.path).with_suffix(".pkl")
         agent.save(save_path)
-        progress.write(f"Agent saved to {cfg.save.path}")
+        progress.write(f"Agent saved to {save_path}")
 
     progress.close()
     if wandb_run is not None:

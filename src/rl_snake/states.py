@@ -11,28 +11,35 @@ class BaseStateEncoder:
 
 
 class FullGridEncoder(BaseStateEncoder):
-    def __init__(self, width: int = 20, height: int = 20):
+    def __init__(self, width: int = 20, height: int = 20, flatten: bool = True):
         super().__init__()
+        self.flatten = flatten
+        shape = (height * width * 3,) if flatten else (height, width, 3)
         self.observation_space = gym.spaces.Box(
             low=0,
             high=1,
-            shape=(height * width * 3,),
+            shape=shape,
             dtype=np.float32,
         )
 
     def encode(self, obs, info):
-        return obs.flatten().astype(np.float32)
+        obs = obs.astype(np.float32)
+        if self.flatten:
+            return obs.flatten()
+        return obs
 
 
 class EgocentricEncoder(BaseStateEncoder):
-    def __init__(self, window_radius: int = 3):
+    def __init__(self, window_radius: int = 3, flatten: bool = True):
         super().__init__()
         self.window_radius = window_radius
+        self.flatten = flatten
         window_size = self.window_radius * 2 + 1
+        shape = (window_size * window_size * 3,) if flatten else (window_size, window_size, 3)
         self.observation_space = gym.spaces.Box(
             low=0,
             high=1,
-            shape=(window_size * window_size * 3,),
+            shape=shape,
             dtype=np.float32,
         )
 
@@ -54,8 +61,10 @@ class EgocentricEncoder(BaseStateEncoder):
             row - self.window_radius : row + self.window_radius + 1,
             col - self.window_radius : col + self.window_radius + 1,
             :,
-        ]
-        return cropped_obs.flatten().astype(np.float32)
+        ].astype(np.float32)
+        if self.flatten:
+            return cropped_obs.flatten()
+        return cropped_obs
 
 
 class FeatureVectorEncoder(BaseStateEncoder):
