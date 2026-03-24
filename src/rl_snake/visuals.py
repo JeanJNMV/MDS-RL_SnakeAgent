@@ -4,6 +4,7 @@ from collections.abc import Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.animation import FuncAnimation
 from matplotlib.axes import Axes
 from matplotlib.colors import ListedColormap
 from matplotlib.figure import Figure
@@ -19,7 +20,6 @@ OBSERVATION_COLORS: Sequence[str] = (
 
 def render_observation(
     observation: np.ndarray,
-    *,
     ax: Axes | None = None,
     title: str | None = None,
 ) -> tuple[Figure, Axes]:
@@ -27,9 +27,6 @@ def render_observation(
     observation = np.asarray(observation)
     if observation.ndim != 2:
         raise ValueError("Observation must be a 2D array.")
-
-    if not np.issubdtype(observation.dtype, np.integer):
-        raise ValueError("Observation must contain integer cell values.")
 
     min_value = int(observation.min())
     max_value = int(observation.max())
@@ -53,3 +50,49 @@ def render_observation(
 
     ax.set_aspect("equal")
     return ax.figure, ax
+
+
+def make_animation(
+    env,
+    agent,
+    get_state,
+    max_frames: int | None = None,
+    interval: int = 150,
+    title: str = "Snake",
+) -> FuncAnimation:
+    """Generate a Matplotlib animation for one rollout."""
+    observations = [env.reset()]
+    done = False
+
+    while not done and (max_frames is None or len(observations) < max_frames):
+        state = get_state(env)
+        action = agent.select_action(state)
+        result = env.step(action)
+        observations.append(result.observation)
+        done = result.done
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    cmap = ListedColormap(OBSERVATION_COLORS)
+    image = ax.imshow(observations[0], cmap=cmap, vmin=0, vmax=len(OBSERVATION_COLORS) - 1)
+
+    height, width = observations[0].shape
+    ax.set_xticks(np.arange(-0.5, width, 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, height, 1), minor=True)
+    ax.grid(which="minor", color="#d6d0c4", linewidth=1)
+    ax.tick_params(which="both", bottom=False, left=False, labelbottom=False, labelleft=False)
+    ax.set_aspect("equal")
+
+    def update(frame_idx: int):
+        image.set_data(observations[frame_idx])
+        ax.set_title(f"{title} | step {frame_idx}")
+        return (image,)
+
+    animation = FuncAnimation(
+        fig,
+        update,
+        frames=len(observations),
+        interval=interval,
+        blit=True,
+        repeat=False,
+    )
+    return animation

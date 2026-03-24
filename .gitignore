@@ -16,3 +16,4 @@ logs/
 wandb
 debug*
 models/
+checkpoints
