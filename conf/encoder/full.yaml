@@ -1,2 +1,0 @@
-_target_ : rl_snake.states.FullGridEncoder
-flatten: true

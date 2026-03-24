@@ -12,5 +12,6 @@ uv run python scripts/train.py \
   reward=sparse \
   wandb=true \
   save.enabled=true \
+  episodes=10000 \
   save.path=q_learning_mlp_sparse \
   "$@"
