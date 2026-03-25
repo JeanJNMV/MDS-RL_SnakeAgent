@@ -8,3 +8,43 @@ wandb: Syncing run simple_cnn
 wandb: ⭐️ View project at https://wandb.ai/fotiskapotos/rl-snake
 wandb: 🚀 View run at https://wandb.ai/fotiskapotos/rl-snake/runs/bvp3fn6p
 wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: uploading history steps 2976-2992, summary; updating run metadata
+wandb: uploading history steps 2976-2992, summary
+wandb: uploading history steps 2976-2992, summary; uploading checkpoints/simple_cnn/ep03000.pt; uploading output.log; uploading wandb-summary.json
+wandb: uploading history steps 2976-2992, summary; uploading checkpoints/simple_cnn/ep03000.pt; uploading checkpoints/simple_cnn/final.pt
+wandb: uploading history steps 2976-2992, summary
+wandb: uploading history steps 2993-2999, summary, console lines 10-12
+wandb: 
+wandb: Run history:
+wandb:      episode ▁▁▁▁▁▂▂▂▃▃▃▃▃▄▄▄▄▄▄▄▅▅▅▅▆▆▆▆▆▆▇▇▇▇▇█████
+wandb:      epsilon █▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:       length ▁▁▁▁▂▂▄▃▄▄▂▃▄▄▃▅▅▅▃▆▄▅▄▆▃▃▆▆▃▄▃▄▆█▄▆█▂▂▂
+wandb:         loss ▁▁▂▂▂▃▂▄▅▅▄▆▅▄▆▅▆▄▅▅▇▅▇▆▆▆▇▆▇█▆▇▇▆▆▇█▆▆▆
+wandb:        steps ▇▃▃▄▂▃▆▅▁▇▃▅▁▄▂▄▆▃▄▂▆▅▄▁▃▃▃▄██▄▃▁▃▆▄▆▁▆▄
+wandb: total_reward ▁▁▂▂▁▂▁▃▃▅▃▄▅▂▄▅▅▅▃▅▅▅▄▆▅▄▄▇▄▆▅▃▅█▂▄▆▅▆▅
+wandb: 
+wandb: Run summary:
+wandb:      episode 3000
+wandb:      epsilon 0.01
+wandb:       length 24
+wandb:         loss 3.99326
+wandb:        steps 307
+wandb: total_reward 200
+wandb: 
+wandb: 🚀 View run simple_cnn at: https://wandb.ai/fotiskapotos/rl-snake/runs/bvp3fn6p
+wandb: ⭐️ View project at: https://wandb.ai/fotiskapotos/rl-snake
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 7 other file(s)
+wandb: Find logs at: ./wandb/run-20260325_100208-bvp3fn6p/logs
+[ 500/3000]  length=16  ε=0.010  saved → checkpoints/simple_cnn/ep00500.pt
+[1000/3000]  length=18  ε=0.010  saved → checkpoints/simple_cnn/ep01000.pt
+[1500/3000]  length=27  ε=0.010  saved → checkpoints/simple_cnn/ep01500.pt
+[2000/3000]  length=15  ε=0.010  saved → checkpoints/simple_cnn/ep02000.pt
+[2500/3000]  length=33  ε=0.010  saved → checkpoints/simple_cnn/ep02500.pt
+[3000/3000]  length=24  ε=0.010  saved → checkpoints/simple_cnn/ep03000.pt
+Training complete. Final checkpoint → checkpoints/simple_cnn/final.pt

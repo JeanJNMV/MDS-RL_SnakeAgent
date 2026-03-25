@@ -1,0 +1,47 @@
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /raid/home/students/fotis/.netrc.
+wandb: Currently logged in as: fotiskapotos to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run 37mfjlec
+wandb: Tracking run with wandb version 0.25.1
+wandb: Run data is saved locally in /raid/home/students/fotis/MVA/MDS-RL_Snake_Agent/wandb/run-20260326_000106-37mfjlec
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run phase2_cnn_params
+wandb: ⭐️ View project at https://wandb.ai/fotiskapotos/rl-snake
+wandb: 🚀 View run at https://wandb.ai/fotiskapotos/rl-snake/runs/37mfjlec
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: updating run metadata
+wandb: uploading summary, console lines 13-13
+wandb: 
+wandb: Run history:
+wandb:      episode ▁▂▂▂▂▂▂▂▂▃▃▃▃▃▃▄▄▄▄▄▄▄▄▄▅▅▅▅▅▆▆▇▇▇▇▇▇███
+wandb:      epsilon █▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:       length ▁▁▁▂▁▃▁▄▃▆▅▅▆▆▆▂▅▅▆▇▄▄▃▂▇██▅█▃▆▃▇▄█▃▂▇▅▂
+wandb:         loss ▆▂▄▃▁▄▁▃▂▃▄▃▃▄▆▅▇▇▆▇▇▆▇▇▇▇▇█▇▇▇▇▇▇▇███▇▇
+wandb:        steps ▁▁▁▂▃▁▃▂▂▄▆▃▄▂▄▅▄▂▃▁▂▂▃▃▁▄▂▄▃▃▂▃▃▂▆█▆▃▄▄
+wandb: total_reward ▁▁▂▁▂▂▂▂▄▃▃▅▅▁▇▃▇▅▂▃▃▇█▄▅▂▆▆▄▅▆▆▄▃▆▆▆▄▆▇
+wandb: 
+wandb: Run summary:
+wandb:      episode 2000
+wandb:      epsilon 0.01
+wandb:       length 17
+wandb:         loss 0.29137
+wandb:        steps 45
+wandb: total_reward 9.56
+wandb: 
+wandb: 🚀 View run phase2_cnn_params at: https://wandb.ai/fotiskapotos/rl-snake/runs/37mfjlec
+wandb: ⭐️ View project at: https://wandb.ai/fotiskapotos/rl-snake
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 5 other file(s)
+wandb: Find logs at: ./wandb/run-20260326_000106-37mfjlec/logs
+[ 500/2000]  length=17  ε=0.010  saved → checkpoints/phase2_cnn_params/ep00500.pt
+  video → checkpoints/phase2_cnn_params/ep00500.gif
+[1000/2000]  length=25  ε=0.010  saved → checkpoints/phase2_cnn_params/ep01000.pt
+  video → checkpoints/phase2_cnn_params/ep01000.gif
+[1500/2000]  length=13  ε=0.010  saved → checkpoints/phase2_cnn_params/ep01500.pt
+  video → checkpoints/phase2_cnn_params/ep01500.gif
+[2000/2000]  length=17  ε=0.010  saved → checkpoints/phase2_cnn_params/ep02000.pt
+  video → checkpoints/phase2_cnn_params/ep02000.gif
+  video → checkpoints/phase2_cnn_params/final.gif
+Training complete. Final checkpoint → checkpoints/phase2_cnn_params/final.pt

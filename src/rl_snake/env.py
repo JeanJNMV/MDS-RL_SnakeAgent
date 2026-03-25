@@ -82,6 +82,7 @@ class SnakeEnv:
         # Obstacles
         obstacles: list[tuple[int, int]] | None = None,
         n_dynamic_obstacles: int = 0,
+        obstacle_wiggle_range: int = 2,
     ) -> None:
         self.height = height
         self.width = width
@@ -107,6 +108,7 @@ class SnakeEnv:
 
         self.obstacles: set[tuple[int, int]] = set(obstacles or [])
         self.n_dynamic_obstacles = n_dynamic_obstacles
+        self.obstacle_wiggle_range = obstacle_wiggle_range
 
         self.snake: list[tuple[int, int]] = []
         self.direction = RIGHT
@@ -117,6 +119,10 @@ class SnakeEnv:
 
         # Dynamic obstacles: each entry is [row, col, direction]
         self.dynamic_obstacles: list[list] = []
+
+        # Cache the last computed observation so CNN agents don't recompute
+        # it twice per step (once in step() return value, once in frame_stack).
+        self._obs_cache: np.ndarray | None = None
 
         self.reset()
 
@@ -140,7 +146,7 @@ class SnakeEnv:
     @property
     def dynamic_obstacle_positions(self) -> set[tuple[int, int]]:
         positions: set[tuple[int, int]] = set()
-        for r, c, _d, ori in self.dynamic_obstacles:
+        for r, c, _d, ori, *_ in self.dynamic_obstacles:
             if ori == "v":
                 positions.update((r + i, c) for i in range(3))
             else:
@@ -159,6 +165,7 @@ class SnakeEnv:
         self.done = False
         self.steps = 0
         self.direction = RIGHT
+        self._obs_cache = None
 
         center_row = self.height // 2
         center_col = self.width // 2
@@ -186,6 +193,7 @@ class SnakeEnv:
                 self._get_observation(), 0.0, True, {"length": self.length, "steps": self.steps}
             )
 
+        self._obs_cache = None  # env state is about to change; invalidate cache
         self.steps += 1
 
         action = int(action)
@@ -237,6 +245,14 @@ class SnakeEnv:
 
         # Dynamic obstacles move after the snake acts
         self._move_dynamic_obstacles()
+
+        # Kill snake if an obstacle moved into any part of the snake
+        if self.all_obstacle_positions & set(self.snake):
+            self.done = True
+            return StepResult(
+                self._get_observation(), self.death_reward, True,
+                {"length": self.length, "steps": self.steps}
+            )
 
         if self.max_steps is not None and self.steps >= self.max_steps:
             self.done = True
@@ -295,6 +311,12 @@ class SnakeEnv:
 
     def _spawn_food(self, food_type: str) -> None:
         occupied = set(self.snake) | self.all_obstacle_positions | set(self.foods)
+        # Exclude the entire row/column that each dynamic obstacle sweeps through
+        for r, c, _d, ori, *_ in self.dynamic_obstacles:
+            if ori == "v":  # moves up/down → block its whole column
+                occupied.update((row, c) for row in range(self.height))
+            else:           # moves left/right → block its whole row
+                occupied.update((r, col) for col in range(self.width))
         free = [(r, c) for r in range(self.height) for c in range(self.width) if (r, c) not in occupied]
         if not free:
             if not self.foods:
@@ -332,7 +354,7 @@ class SnakeEnv:
 
             idx = int(self.rng.integers(len(valid)))
             r, c = valid[idx]
-            self.dynamic_obstacles.append([r, c, direction, ori])
+            self.dynamic_obstacles.append([r, c, direction, ori, r, c])  # last two = origin
 
             if ori == "v":
                 occupied.update((r + i, c) for i in range(3))
@@ -340,32 +362,37 @@ class SnakeEnv:
                 occupied.update((r, c + i) for i in range(3))
 
     def _move_dynamic_obstacles(self) -> None:
-        """Move each wall obstacle one step; rebound off grid boundaries."""
+        """Move each wall obstacle one step; rebound off grid boundaries or wiggle limit."""
         for obs in self.dynamic_obstacles:
-            r, c, d, ori = obs
+            r, c, d, ori, or_, oc = obs
             dr, dc = self.ACTION_TO_DELTA[d]
 
             if ori == "v":
                 new_cells = [(r + dr + i, c) for i in range(3)]
+                at_limit = abs(r + dr - or_) > self.obstacle_wiggle_range
             else:
                 new_cells = [(r + dr, c + dc + i) for i in range(3)]
+                at_limit = abs(c + dc - oc) > self.obstacle_wiggle_range
 
             out_of_bounds = any(
                 nr < 0 or nr >= self.height or nc < 0 or nc >= self.width for nr, nc in new_cells
             )
 
-            if out_of_bounds:
+            if out_of_bounds or at_limit:
                 obs[2] = _OPPOSITE[d]  # reverse direction, stay put this step
             else:
                 obs[0] += dr
                 obs[1] += dc
 
     def _get_observation(self) -> np.ndarray:
+        if self._obs_cache is not None:
+            return self._obs_cache.copy()
+
         grid = np.zeros((self.height, self.width), dtype=np.int8)
 
         for r, c in self.obstacles:
             grid[r, c] = 6
-        for r, c, _d, ori in self.dynamic_obstacles:
+        for r, c, _d, ori, *_ in self.dynamic_obstacles:
             if ori == "v":
                 for i in range(3):
                     grid[r + i, c] = 6
@@ -381,4 +408,5 @@ class SnakeEnv:
         for (r, c), ftype in self.foods.items():
             grid[r, c] = _FOOD_GRID_VALUES[ftype]
 
+        self._obs_cache = grid
         return grid.copy()

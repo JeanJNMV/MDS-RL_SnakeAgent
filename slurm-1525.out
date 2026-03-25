@@ -1,0 +1,48 @@
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /raid/home/students/fotis/.netrc.
+wandb: Currently logged in as: fotiskapotos to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run 1x1os6s2
+wandb: Tracking run with wandb version 0.25.1
+wandb: Run data is saved locally in /raid/home/students/fotis/MVA/MDS-RL_Snake_Agent/wandb/run-20260325_104753-1x1os6s2
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run simple_mlp
+wandb: ⭐️ View project at https://wandb.ai/fotiskapotos/rl-snake
+wandb: 🚀 View run at https://wandb.ai/fotiskapotos/rl-snake/runs/1x1os6s2
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+wandb: updating run metadata
+wandb: uploading config.yaml
+wandb: uploading summary, console lines 11-13
+wandb: 
+wandb: Run history:
+wandb:      episode ▁▁▂▂▂▂▂▂▃▃▃▃▃▄▄▄▄▄▄▅▅▅▅▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇█
+wandb:      epsilon ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:       length ▁▁▄▃▄▄▅▆▃▅▇▇▄▁▃▅▅▇▅▅▃▆▅▇▅▆▃▆▃▇▇▁▇▇▂▅█▂▆▅
+wandb:         loss ▁▄▃▃▄▅▆▆▆▆▇▇▆▇▇▆▇▇▇▇▇▇█▇▇▇▇▇▇▇▇▇▇███▇▇▆▇
+wandb:        steps ▁▁▁▂▃▅▅▁▄▅▄▃▅▅▃▄▃▇▅▆▄▃▆▃▇▆▅▄▇▅▄█▇▆▅▃▅▅▃▅
+wandb: total_reward █▃█▅▄▂▅█▅▄▆▄▆▅▅▅▂▇▅▄▄▆▁▅▄▅▃▁▅▄█▆▅▄▅▁▄▂▆▅
+wandb: 
+wandb: Run summary:
+wandb:      episode 2000
+wandb:      epsilon 0.01
+wandb:       length 7
+wandb:         loss 1.29981
+wandb:        steps 29
+wandb: total_reward 30
+wandb: 
+wandb: 🚀 View run simple_mlp at: https://wandb.ai/fotiskapotos/rl-snake/runs/1x1os6s2
+wandb: ⭐️ View project at: https://wandb.ai/fotiskapotos/rl-snake
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 5 other file(s)
+wandb: Find logs at: ./wandb/run-20260325_104753-1x1os6s2/logs
+[ 500/2000]  length=22  ε=0.010  saved → checkpoints/simple_mlp/ep00500.pt
+  video → checkpoints/simple_mlp/ep00500.gif
+[1000/2000]  length=24  ε=0.010  saved → checkpoints/simple_mlp/ep01000.pt
+  video → checkpoints/simple_mlp/ep01000.gif
+[1500/2000]  length=21  ε=0.010  saved → checkpoints/simple_mlp/ep01500.pt
+  video → checkpoints/simple_mlp/ep01500.gif
+[2000/2000]  length=7  ε=0.010  saved → checkpoints/simple_mlp/ep02000.pt
+  video → checkpoints/simple_mlp/ep02000.gif
+  video → checkpoints/simple_mlp/final.gif
+Training complete. Final checkpoint → checkpoints/simple_mlp/final.pt

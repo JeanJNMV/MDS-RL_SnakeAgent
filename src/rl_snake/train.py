@@ -65,6 +65,15 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Number of moving wall segments (size 3)",
     )
+    p.add_argument(
+        "--obstacle-wiggle-range",
+        type=int,
+        default=2,
+        help="Max squares each dynamic obstacle moves from its spawn position",
+    )
+
+    # Environment — snake
+    p.add_argument("--init-length", type=int, default=3, help="Initial snake length")
 
     # Agent
     p.add_argument("--lr", type=float, default=1e-3)
@@ -88,6 +97,12 @@ def parse_args() -> argparse.Namespace:
         help="Soft target update rate τ (None = hard update every --target-update steps; "
              "recommended: 0.005 for soft updates)",
     )
+    p.add_argument(
+        "--n-step",
+        type=int,
+        default=1,
+        help="N-step return length (1 = standard 1-step TD; 3 propagates reward 3× faster)",
+    )
 
     # Architecture
     p.add_argument(
@@ -107,8 +122,22 @@ def parse_args() -> argparse.Namespace:
         help="Enable dueling network architecture",
     )
 
+    # Curriculum
+    p.add_argument(
+        "--load-checkpoint",
+        type=str,
+        default=None,
+        help="Path to a .pt checkpoint to warm-start from (weights only, epsilon is reset)",
+    )
+
     # Training
     p.add_argument("--episodes", type=int, default=2_000)
+    p.add_argument(
+        "--train-freq",
+        type=int,
+        default=4,
+        help="Call learn() every this many env steps (4 = standard DQN; 1 = every step)",
+    )
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--save-dir", type=str, default="checkpoints")
     p.add_argument("--save-every", type=int, default=500)
@@ -153,6 +182,8 @@ def train(args: argparse.Namespace) -> None:
         n_poison=args.n_poison,
         poison_shrink=args.poison_shrink,
         n_dynamic_obstacles=args.n_dynamic_obstacles,
+        obstacle_wiggle_range=args.obstacle_wiggle_range,
+        init_length=args.init_length,
     )
 
     if args.agent_type == "cnn":
@@ -173,6 +204,7 @@ def train(args: argparse.Namespace) -> None:
             dueling=args.dueling,
             grad_clip=args.grad_clip or None,
             target_tau=args.target_tau,
+            n_step=args.n_step,
         )
         extract_state = get_grid_state
     else:
@@ -191,13 +223,23 @@ def train(args: argparse.Namespace) -> None:
             dueling=args.dueling,
             grad_clip=args.grad_clip or None,
             target_tau=args.target_tau,
+            n_step=args.n_step,
         )
         extract_state = get_state
+
+    if args.load_checkpoint:
+        agent.load(args.load_checkpoint)
+        # Reset epsilon to the requested start value so curriculum training
+        # begins with the intended exploration rate, not the saved one.
+        agent.epsilon = args.epsilon_start
+        print(f"Loaded checkpoint: {args.load_checkpoint}")
 
     frame_stack = FrameStack(args.n_frames, extract_state)
 
     save_dir = Path(args.save_dir) / run_name
     save_dir.mkdir(parents=True, exist_ok=True)
+
+    total_steps = 0  # global step counter for train_freq scheduling
 
     for episode in range(1, args.episodes + 1):
         env.reset()
@@ -211,9 +253,12 @@ def train(args: argparse.Namespace) -> None:
             next_state = frame_stack.step(env)
 
             agent.store_transition(state, action, result.reward, next_state, result.done)
-            loss = agent.learn()
-            if loss is not None:
-                episode_losses.append(loss)
+
+            total_steps += 1
+            if total_steps % args.train_freq == 0:
+                loss = agent.learn()
+                if loss is not None:
+                    episode_losses.append(loss)
 
             state = next_state
             total_reward += result.reward

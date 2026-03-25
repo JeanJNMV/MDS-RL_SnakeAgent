@@ -113,7 +113,11 @@ def get_state(env: SnakeEnv) -> np.ndarray:
 
 
 def get_grid_state(env: SnakeEnv) -> np.ndarray:
-    """Return the full grid as a 6-channel binary float array (C, H, W).
+    """Return the full grid as a 6-channel binary uint8 array (C, H, W).
+
+    Using uint8 (values 0/1) instead of float32 reduces replay-buffer memory
+    by 4× for CNN agents. Conversion to float32 happens at sample time inside
+    ReplayBuffer.sample(), so networks always receive float32 tensors.
 
     Channels:
         0 = snake body
@@ -124,7 +128,7 @@ def get_grid_state(env: SnakeEnv) -> np.ndarray:
         5 = obstacle (static or dynamic)
     """
     obs = env._get_observation()  # (H, W) with values 0-6
-    grid = np.zeros((6, env.height, env.width), dtype=np.float32)
+    grid = np.zeros((6, env.height, env.width), dtype=np.uint8)
     grid[0] = obs == 1  # body
     grid[1] = obs == 2  # head
     grid[2] = obs == 3  # gold food
@@ -179,8 +183,24 @@ class FrameStack:
 
 
 class ReplayBuffer:
+    """Circular numpy replay buffer.
+
+    Compared to a deque-based buffer, numpy O(1) fancy-index sampling avoids
+    the O(capacity) deque→list materialisation that random.sample() requires.
+    Arrays are allocated lazily on the first push so the state shape does not
+    need to be known at construction time.
+    """
+
     def __init__(self, capacity: int = 100_000) -> None:
-        self._buf: deque = deque(maxlen=capacity)
+        self._capacity = capacity
+        self._pos = 0
+        self._size = 0
+        # Allocated on first push once we know state shape/dtype
+        self._states: np.ndarray | None = None
+        self._next_states: np.ndarray | None = None
+        self._actions: np.ndarray | None = None
+        self._rewards: np.ndarray | None = None
+        self._dones: np.ndarray | None = None
 
     def push(
         self,
@@ -190,21 +210,75 @@ class ReplayBuffer:
         next_state: np.ndarray,
         done: bool,
     ) -> None:
-        self._buf.append((state, action, reward, next_state, done))
+        if self._states is None:
+            self._states = np.empty((self._capacity, *state.shape), dtype=state.dtype)
+            self._next_states = np.empty_like(self._states)
+            self._actions = np.empty(self._capacity, dtype=np.int64)
+            self._rewards = np.empty(self._capacity, dtype=np.float32)
+            self._dones = np.empty(self._capacity, dtype=np.float32)
+        self._states[self._pos] = state
+        self._next_states[self._pos] = next_state
+        self._actions[self._pos] = action
+        self._rewards[self._pos] = reward
+        self._dones[self._pos] = float(done)
+        self._pos = (self._pos + 1) % self._capacity
+        self._size = min(self._size + 1, self._capacity)
 
     def sample(self, batch_size: int):
-        batch = random.sample(self._buf, batch_size)
-        states, actions, rewards, next_states, dones = zip(*batch, strict=False)
+        idxs = np.random.randint(0, self._size, size=batch_size)
+        states      = self._states[idxs]
+        next_states = self._next_states[idxs]
+        # CNN stores uint8 (0/1 binary grid) to save 4× memory; convert here.
+        if states.dtype != np.float32:
+            states      = states.astype(np.float32)
+            next_states = next_states.astype(np.float32)
         return (
-            np.stack(states),
-            np.array(actions, dtype=np.int64),
-            np.array(rewards, dtype=np.float32),
-            np.stack(next_states),
-            np.array(dones, dtype=np.float32),
+            states,
+            self._actions[idxs],
+            self._rewards[idxs],
+            next_states,
+            self._dones[idxs],
         )
 
     def __len__(self) -> int:
-        return len(self._buf)
+        return self._size
+
+
+class _NStepBuffer:
+    """Accumulates transitions and emits n-step compressed (s, a, G, s_n, done) tuples.
+
+    G = r_0 + γ·r_1 + … + γ^(n-1)·r_{n-1}  (partial sum; bootstrap handled in learn())
+    done = any terminal flag in the window (so bootstrap is skipped correctly)
+
+    Usage: call push() every step; it feeds completed transitions into `replay`.
+    When the episode ends call flush() to drain the remaining window.
+    """
+
+    def __init__(self, n: int, gamma: float, replay: ReplayBuffer) -> None:
+        self.n = n
+        self.gamma = gamma
+        self.replay = replay
+        self._window: deque = deque()  # unbounded; we manage size manually
+
+    def push(self, state, action, reward, next_state, done) -> None:
+        self._window.append((state, action, reward, next_state, done))
+        # Emit one n-step transition whenever the window is full
+        if len(self._window) >= self.n:
+            self._emit()
+        if done:
+            # Flush remaining transitions (< n steps) at episode end
+            while self._window:
+                self._emit()
+
+    def _emit(self) -> None:
+        n = min(self.n, len(self._window))
+        s0, a0 = self._window[0][0], self._window[0][1]
+        G = sum(self.gamma ** i * self._window[i][2] for i in range(n))
+        s_next = self._window[n - 1][3]
+        # done=True if any transition in the window is terminal
+        done_n = any(t[4] for t in list(self._window)[:n])
+        self.replay.push(s0, a0, G, s_next, done_n)
+        self._window.popleft()
 
 
 # ---------------------------------------------------------------------------
@@ -358,8 +432,13 @@ class _BaseDQNAgent(BaseAgent):
         double_dqn: bool = False,
         grad_clip: float | None = 10.0,
         target_tau: float | None = None,
+        n_step: int = 1,
     ) -> None:
         self.gamma = gamma
+        self.n_step = n_step
+        # gamma^n is used as the bootstrap discount in learn(); rewards in the
+        # replay buffer already encode the n-step cumulative return G.
+        self.gamma_n = gamma ** n_step
         self.epsilon = epsilon_start
         self.epsilon_end = epsilon_end
         self.epsilon_decay = epsilon_decay
@@ -383,6 +462,10 @@ class _BaseDQNAgent(BaseAgent):
         self.optimizer = optimizer_cls(self.q_net.parameters(), lr=lr)
 
         self.buffer = ReplayBuffer(buffer_capacity)
+        # n-step accumulator — wraps self.buffer; passthrough when n_step=1
+        self._n_step_buf: _NStepBuffer | None = (
+            _NStepBuffer(n_step, gamma, self.buffer) if n_step > 1 else None
+        )
         self._steps = 0
 
     def select_action(self, state: np.ndarray) -> int:
@@ -400,7 +483,10 @@ class _BaseDQNAgent(BaseAgent):
         next_state: np.ndarray,
         done: bool,
     ) -> None:
-        self.buffer.push(state, action, reward, next_state, done)
+        if self._n_step_buf is not None:
+            self._n_step_buf.push(state, action, reward, next_state, done)
+        else:
+            self.buffer.push(state, action, reward, next_state, done)
 
     def learn(self) -> float | None:
         if len(self.buffer) < self.batch_size:
@@ -408,11 +494,12 @@ class _BaseDQNAgent(BaseAgent):
 
         states, actions, rewards, next_states, dones = self.buffer.sample(self.batch_size)
 
-        s  = torch.tensor(states,      device=self.device)
-        a  = torch.tensor(actions,     device=self.device)
-        r  = torch.tensor(rewards,     device=self.device)
-        s_ = torch.tensor(next_states, device=self.device)
-        d  = torch.tensor(dones,       device=self.device)
+        # torch.as_tensor avoids an extra Python object vs torch.tensor()
+        s  = torch.as_tensor(states,      dtype=torch.float32, device=self.device)
+        a  = torch.as_tensor(actions,     dtype=torch.int64,   device=self.device)
+        r  = torch.as_tensor(rewards,     dtype=torch.float32, device=self.device)
+        s_ = torch.as_tensor(next_states, dtype=torch.float32, device=self.device)
+        d  = torch.as_tensor(dones,       dtype=torch.float32, device=self.device)
 
         q_values = self.q_net(s).gather(1, a.unsqueeze(1)).squeeze(1)
 
@@ -423,7 +510,8 @@ class _BaseDQNAgent(BaseAgent):
                 max_next_q = self.target_net(s_).gather(1, best_actions.unsqueeze(1)).squeeze(1)
             else:
                 max_next_q = self.target_net(s_).max(dim=1).values
-            targets = r + self.gamma * max_next_q * (1.0 - d)
+            # r already encodes the n-step cumulative return G; gamma_n = gamma^n
+            targets = r + self.gamma_n * max_next_q * (1.0 - d)
 
         # Huber loss is less sensitive to outlier Q-value targets than MSE
         loss = nn.functional.smooth_l1_loss(q_values, targets)
@@ -505,6 +593,7 @@ class DQNAgent(_BaseDQNAgent):
         dueling: bool = False,
         grad_clip: float | None = 10.0,
         target_tau: float | None = None,
+        n_step: int = 1,
     ) -> None:
         dev = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         state_dim = self.BASE_STATE_DIM * n_frames
@@ -524,6 +613,7 @@ class DQNAgent(_BaseDQNAgent):
             double_dqn=double_dqn,
             grad_clip=grad_clip,
             target_tau=target_tau,
+            n_step=n_step,
         )
 
 
@@ -557,6 +647,7 @@ class CNNDQNAgent(_BaseDQNAgent):
         dueling: bool = False,
         grad_clip: float | None = 10.0,
         target_tau: float | None = None,
+        n_step: int = 1,
     ) -> None:
         dev = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         in_channels = self.BASE_CHANNELS * n_frames
@@ -578,4 +669,5 @@ class CNNDQNAgent(_BaseDQNAgent):
             double_dqn=double_dqn,
             grad_clip=grad_clip,
             target_tau=target_tau,
+            n_step=n_step,
         )
