@@ -27,8 +27,7 @@ vector, an egocentric convolutional window, and a full-grid CNN observation.
 Using DQN and its extensions (Double DQN, Dueling networks, frame stacking), we study the ability of our agents to solve, generalize and adapt to a range of different environments, from easy to complex.
 Our results show that CNN-based agents consistently outperform hand-crafted
 MLP agents in complex environments.
-\keywords{Deep Q-Network \and Reward Shaping \and State Representation
-          \and Snake \and Gymnasium}
+You can find our extensive results here: \url{https://wandb.ai/fotiskapotos/rl-snake?nw=nwuserfotiskapotos} and our code here: \url{https://github.com/JeanJNMV/MDS-RL_SnakeAgent}.
 \end{abstract}
 
 % ── 1. Introduction ───────────────────────────────────────────────────────────
@@ -43,17 +42,6 @@ with multiple food types (gold, silver, poison) and dynamic obstacles.
 
 We study how different state representations and training strategies impact
 performance across environments of increasing complexity.
-
-We address three research questions:
-\begin{enumerate}
-  \item \textbf{Solving easy mode.} How do hand-crafted features compare to
-        learned spatial representations (egocentric CNN vs.\ full-grid CNN)?
-  \item \textbf{Reward design.} What is the effect of dense reward signals
-        (distance shaping, body-repulsion) on convergence and performance?
-  \item \textbf{Scalability to hard mode.} How do different architectures
-        generalise as environment complexity increases?
-\end{enumerate}
-
 \noindent\textbf{Contributions.}
 \begin{itemize}
   \item A configurable Snake environment with multiple observation spaces,
@@ -63,112 +51,49 @@ We address three research questions:
         frame stacking) in complex environments.
 \end{itemize}
 
-% ── 2. Environment ────────────────────────────────────────────────────────────
 \section{Environment}
 \label{sec:env}
 
-\subsection{State Representation}
-\label{sec:obs}
+\paragraph{State and observations.}
+The environment is a discrete $H \times W$ grid (typically $16 \times 16$),
+where each cell corresponds to empty space, snake body/head, gold, silver,
+poison, or obstacle. We consider three observation modalities:
+(i) \textbf{MLP features}: a 15-dimensional binary vector encoding collision
+risks (straight/left/right), current direction, and relative positions of
+nearest food and poison;
+(ii) \textbf{Egocentric CNN}: a $C \times k \times k$ tensor centered on the
+head with $C=6$ channels (body, head, gold, silver, poison, obstacles),
+capturing local spatial structure;
+(iii) \textbf{Full-grid CNN}: a $C \times H \times W$ tensor providing global
+context at higher dimensional cost.
 
-The environment is a discrete $H \times W$ grid (typically $16 \times 16$).
-Each cell encodes one of the following values: empty cell, snake body, snake head, gold food, silver food, poisson or obstacle.
-We consider three observation modalities:
+\paragraph{Dynamics and actions.}
+At each step, the agent selects one of four absolute actions (up, right, down,
+left). Reverse moves can be disallowed, in which case the snake continues
+forward. The dynamics follow standard Snake rules: the head moves, the tail is
+removed if no food is consumed, the snake grows when eating gold or silver,
+and shrinks when consuming poison.
 
-\textbf{Hand-crafted features (MLP).}
-A 15-dimensional binary vector encoding:
-(i) collision risks (straight, left, right),
-(ii) current direction (one-hot),
-(iii) relative position of nearest food,
-(iv) relative position of nearest poison.
-
-\textbf{Egocentric CNN.}
-A $C \times k \times k$ tensor centred on the head, with $C=6$ channels
-(body, head, gold, silver, poison, obstacles).
-This enforces locality and translation invariance.
-
-\textbf{Full-grid CNN.}
-A $C \times H \times W$ tensor covering the entire board,
-providing global spatial information at higher dimensional cost.
-
-\subsection{Action Space and Dynamics}
-\label{sec:action}
-
-At each step, the agent selects one of four \emph{absolute} actions:
-up, right, down, or left.
-
-Reverse moves can optionally be disallowed, in which case attempting
-to reverse direction results in continuing forward.
-
-The snake evolves as follows:
-\begin{itemize}
-  \item The head moves to a new cell according to the chosen action.
-  \item If no food is consumed, the tail is removed (constant length).
-  \item If gold or silver food is consumed, the snake grows (tail kept).
-  \item If poison is consumed, the snake shrinks by a fixed number of segments.
-\end{itemize}
-\subsection{Reward Function}
-\label{sec:reward}
-
-Rewards are additive:
-\begin{itemize}
-  \item Gold: $+r_g$, \quad Silver: $+r_s$
-  \item Poison: $+r_p$ ($\leq 0$), with shrink
-  \item Death: $r_d < 0$, \quad Step: $r_{\text{step}}$
-\end{itemize}
-
-When no food is consumed, we add potential-based shaping:
+\paragraph{Rewards.}
+Rewards are additive: gold $+r_g$, silver $+r_s$, poison $+r_p \leq 0$, death
+$r_d < 0$, and a step reward $r_{\text{step}}$. When no food is consumed, we
+add potential-based shaping:
 \begin{align}
 r_t \mathrel{+}= \lambda (d_{t-1} - d_t) + \mu (b_t - b_{t-1}),
 \end{align}
-where $d_t$ is the Manhattan distance to the nearest (non-poison) food and
-$b_t$ the distance to the nearest body segment.
+where $d_t$ is the Manhattan distance to the nearest non-poison food and $b_t$
+the distance to the nearest body segment. The first term promotes food-seeking,
+while the second discourages self-collisions.
 
-The first term drives food-seeking, while the second discourages
-self-collisions, especially for long snakes.
-
-\subsection{Obstacles and Dynamics}
-\label{sec:obstacles}
-
-The environment includes three types of obstacles:
-
-\begin{itemize}
-  \item \textbf{Static obstacles}: fixed cells placed at initialization.
-  \item \textbf{Random obstacles}: sampled at each episode reset.
-  \item \textbf{Dynamic obstacles}: 3-cell walls that oscillate deterministically
-        along a fixed axis (horizontal or vertical), reversing direction every step.
-\end{itemize}
-
-Food is never spawned in cells occupied by obstacles or in regions swept by
-dynamic obstacles.
-
-\subsection{Environment Configurations}
-\label{sec:configs}
-
-We define two main environment regimes used throughout our experiments.
-
-\textbf{Easy environment.}
-\begin{itemize}
-  \item Grid size: $16 \times 16$
-  \item Food: 1 gold item (no silver or poison)
-  \item Obstacles: none
-  \item Dynamics: static environment
-\end{itemize}
-This configuration isolates core navigation and growth behaviour without additional sources of stochasticity or risk.
-
-\textbf{Hard environment.}
-\begin{itemize}
-  \item Grid size: $16 \times 16$
-  \item Food: multiple items (typically 2 gold, 3 silver, 1 poison)
-  \item Obstacles:
-  \begin{itemize}
-    \item Static obstacles (fixed walls)
-    \item Random obstacles (sampled at reset)
-    \item Dynamic obstacles (3-cell walls oscillating along a fixed axis)
-  \end{itemize}
-  \item Dynamics: non-stationary due to moving obstacles
-\end{itemize}
-
-This setting introduces long-horizon planning challenges, partial observability under egocentric views, and increased risk of self-trapping, particularly for long snakes.
+\paragraph{Obstacles and settings.}
+We consider static obstacles (fixed), random obstacles (sampled at reset), and
+dynamic obstacles (3-cell walls oscillating along a fixed axis). Food is never
+spawned in occupied or swept regions. We define two regimes:
+\textbf{easy} ($16 \times 16$, one gold item, no obstacles, static dynamics)
+and \textbf{hard} ($16 \times 16$, multiple foods including poison, static,
+random, and dynamic obstacles). The hard setting introduces non-stationarity,
+partial observability under egocentric views, and long-horizon planning
+challenges.
 % ── 3. Methods ────────────────────────────────────────────────────────────────
 \section{Methods}
 \label{sec:methods}
@@ -177,56 +102,34 @@ All agents share the same DQN training loop: $\epsilon$-greedy exploration with
 linear annealing, experience replay (buffer size 100\,000), and a target
 network updated every $C$ steps.
 
-\subsection{MLP DQN (Baseline)}
-\label{sec:mlp}
+\paragraph{Architectures.}
+We consider three state representations.
+(i) \textbf{MLP (baseline):} a 3-layer fully-connected network
+($256$--$128$--$3$) operating on a 15-dimensional hand-crafted feature vector,
+which directly encodes collision risks, direction, and relative food/poison
+positions.
+(ii) \textbf{Egocentric CNN:} two convolutional layers followed by two
+fully-connected layers processing a $6 \times k \times k$ window centered on
+the head, enforcing locality and translation equivariance.
+(iii) \textbf{Full-grid CNN:} the same architecture applied to the full
+$C \times H \times W$ board, providing global spatial context at higher
+dimensional cost.
 
-A 3-layer fully-connected network ($256$--$128$--$3$) consumes the 15-dim
-hand-crafted feature vector.
-This is the simplest and most data-efficient architecture — the features
-encode exactly the information needed for collision avoidance and food targeting
-on the simple environment.
-
-\subsection{CNN DQN — Egocentric Window}
-\label{sec:cnn_window}
-
-Two convolutional layers followed by two fully-connected layers process the
-$6 \times k \times k$ egocentric observation.
-The local receptive field and translation equivariance match the structure of
-the control problem: the decision of whether to turn depends primarily on
-what is immediately around the head.
-
-\subsection{CNN DQN — Full Grid}
-\label{sec:cnn_full}
-
-The same convolutional architecture is applied to the full $C \times H \times W$
-board observation.
-The agent retains access to global context (distant food, global body shape),
-which is expected to help in long-horizon planning at the cost of a higher-
-dimensional input.
-
-\subsection{Double DQN and Dueling Networks}
-\label{sec:ddqn_dueling}
-
-\textbf{Double DQN} decouples action selection from action evaluation,
-reducing the overestimation bias of vanilla DQN:
+\paragraph{DQN extensions.}
+We use \textbf{Double DQN} to reduce overestimation bias by decoupling action
+selection and evaluation:
 \begin{equation}
   y_t = r_t + \gamma\, Q\bigl(s_{t+1},\,\arg\max_a Q(s_{t+1}, a;\,\theta);\,\theta^-\bigr).
 \end{equation}
+We also use \textbf{Dueling networks}, decomposing $Q(s,a)$ into a state-value
+$V(s)$ and an advantage $A(s,a)$ as
+$Q(s,a) = V(s) + \bigl(A(s,a) - \overline{A}(s)\bigr)$, which improves learning
+in states where actions have similar value.
 
-\textbf{Dueling networks} split the convolutional trunk into a state-value head
-$V(s)$ and an advantage head $A(s,a)$, combining them as
-$Q(s,a) = V(s) + \bigl(A(s,a) - \overline{A}(s)\bigr)$.
-This decomposition accelerates convergence in states where survival matters
-more than which food to pursue next.
-
-\subsection{Frame Stacking ($n=4$)}
-\label{sec:framestack}
-
-The last four grid observations are concatenated into a
-$(4C) \times H \times W$ tensor before being fed to the CNN.
-Frame stacking encodes obstacle velocity from positional differences across
-frames, converting the partially-observable dynamic-obstacle setting into an
-approximately Markovian state.
+\paragraph{Temporal encoding.}
+For CNN agents, we stack the last $n=4$ observations into a
+$(4C) \times H \times W$ tensor. This provides implicit velocity information
+for dynamic obstacles and mitigates partial observability.
 
 % ── 4. Experiments ────────────────────────────────────────────────────────────
 \section{Experiments}
@@ -235,12 +138,9 @@ approximately Markovian state.
 \subsection{Experimental Setup}
 \label{sec:setup}
 
-We summarise our main experiments; all runs are available at:
-\url{https://wandb.ai/fotiskapotos/rl-snake?nw=nwuserfotiskapotos}.
-
 Our primary evaluation metric is the snake length, complemented by
 total reward and episode length (steps). Due to the high variance of
-training, all curves are smoothed using an exponential moving average.
+training, all curves are smoothed using an exponential moving average. All the runs were performed on a NVIDIA A100 GPU cluster.
 
 \subsection{MLP agent on the easy environment}
 \label{sec:exp_baseline}
@@ -256,13 +156,13 @@ but can affect training stability and the speed of convergence.
 
 \begin{figure}[h]
   \centering
-  \begin{subfigure}{0.48\linewidth}
+  \begin{subfigure}{0.40\linewidth}
     \centering
     \includegraphics[width=\linewidth]{../poster/img/MLP rewards.png}
     \caption{Baseline vs.\ step penalty vs.\ distance shaping}
   \end{subfigure}
   \hfill
-  \begin{subfigure}{0.48\linewidth}
+  \begin{subfigure}{0.40\linewidth}
     \centering
     \includegraphics[width=\linewidth]{../poster/img/reward magnitude_scaling.png}
     \caption{Effect of reward magnitude scaling}
@@ -272,29 +172,35 @@ but can affect training stability and the speed of convergence.
 
 \subsection{CNN agents on the easy environment}
 We next replace the MLP with convolutional agents operating directly on
-grid observations. We consider both egocentric-window inputs and full-grid
-representations.
+grid observations, considering both egocentric-window and full-grid inputs
+(Fig.~\ref{fig:cnn_comparison}).
+
+The egocentric CNN learns faster in the early stages of training
+(Fig.~\ref{fig:ego_vs_full}), benefiting from its focused local representation.
+However, it converges to a slightly lower final performance than the full-grid
+CNN, which has access to global spatial information.
+
+We also compare CNN and MLP agents (Fig.~\ref{fig:mlp_vs_cnn}). While the CNN
+converges more slowly, it achieves slightly better final performance.
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.7\linewidth]{../poster/img/Ergovsfull.png}
-  \caption{Comparison between egocentric and full-grid CNN agents on the easy environment.}
+  \begin{subfigure}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{../poster/img/Ergovsfull.png}
+    \caption{Egocentric vs.\ full-grid CNN}
+    \label{fig:ego_vs_full}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{../poster/img/train_simple.png}
+    \caption{MLP vs.\ CNN}
+    \label{fig:mlp_vs_cnn}
+  \end{subfigure}
+  \caption{Performance comparison of architectures on the easy environment.}
+  \label{fig:cnn_comparison}
 \end{figure}
-
-The egocentric CNN learns faster in the early stages of training, benefiting
-from its focused local representation. However, it converges to a slightly
-lower final performance compared to the full-grid CNN, which has access to
-global spatial information.
-
-We also train the full CNN agent for longer and compare against the performances of the MLP agent.
-
-\begin{figure}[h]
-  \centering
-  \includegraphics[width=0.7\linewidth]{../poster/img/train_simple.png}
-  \caption{Comparison between MLP and CNN on the easy enviroment}
-\end{figure}
-
-We find that even thought the CNN agent converges much slower, its final performance is slightly better than the MLP.
 
 \subsection{Results on the Hard Environment}
 \subsubsection{Adaptation of Pre-trained Agents}
@@ -339,7 +245,7 @@ parameters to improve convergence and stability.
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.7\linewidth]{../poster/img/finalfinal.png}
+  \includegraphics[width=0.5\linewidth]{../poster/img/finalfinal.png}
   \caption{Training performance of the CNN agent on the hard environment.}
 \end{figure}
 
