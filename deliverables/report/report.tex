@@ -11,8 +11,7 @@
 \title{Sneakie: Learning to Play the Snake Game in All Its Forms}
 \titlerunning{Sneakie: Deep RL on Snake}
 
-\author{JAMAL Adonis \and  KAPOTOS Fotios \and MARTINI Jean }
-% \authorrunning{Kapotos et al.}
+\author{JAMAL Adonis \and  KAPOTOS Fotios \and MARTINI Jean-Vincent }
 \institute{CentraleSupélec}
 \maketitle
 
@@ -42,7 +41,9 @@ with multiple food types (gold, silver, poison) and dynamic obstacles.
 
 We study how different state representations and training strategies impact
 performance across environments of increasing complexity.
-\noindent\textbf{Contributions.}
+Notably, a standard DQN agent~\cite{mnih2015human} quickly reaches very good performance on the classic Snake game \cite{wei2018autonomous}, effectively hitting a performance ceiling; we therefore designed a substantially harder variant of the environment and shifted our focus to understanding how different architectures and training techniques cope with this increased complexity.
+
+\noindent\textbf{Main contributions.}
 \begin{itemize}
   \item A configurable Snake environment with multiple observation spaces,
         reward functions, and a hard mode with dynamic obstacles.
@@ -51,19 +52,36 @@ performance across environments of increasing complexity.
         frame stacking) in complex environments.
 \end{itemize}
 
-\section{Environment}
+\section{Related Work}
+\label{sec:related}
+
+Several works have applied deep reinforcement learning to the Snake game.
+Wei et al.~\cite{wei2018autonomous} trained a CNN-based DQN agent on the
+classic Snake game, proposing a proximity-based reward mechanism and a
+dual experience replay strategy to handle sparse and delayed rewards.
+Sebastianelli et al.~\cite{sebastianelli2021deep} explored DQN with
+hand-crafted sensor features rather than image pixels, showing that
+compact state representations can achieve competitive performance with
+significantly reduced training time.
+In contrast to these works, our study goes beyond the classic single-food
+setting by introducing multiple food types, poison, and dynamic obstacles,
+and provides a systematic comparison of hand-crafted MLP features against
+egocentric and full-grid CNN representations across environments of
+increasing complexity.
+ 
+\section{Environment Design}
 \label{sec:env}
 
 \paragraph{State and observations.}
 The environment is a discrete $H \times W$ grid (typically $16 \times 16$),
 where each cell corresponds to empty space, snake body/head, gold, silver,
-poison, or obstacle. We consider three observation modalities:
+poison, or obstacle. We consider three observation modalities:\\
 (i) \textbf{MLP features}: a 15-dimensional binary vector encoding collision
 risks (straight/left/right), current direction, and relative positions of
-nearest food and poison;
+nearest food and poison;\\
 (ii) \textbf{Egocentric CNN}: a $C \times k \times k$ tensor centered on the
 head with $C=6$ channels (body, head, gold, silver, poison, obstacles),
-capturing local spatial structure;
+capturing local spatial structure;\\
 (iii) \textbf{Full-grid CNN}: a $C \times H \times W$ tensor providing global
 context at higher dimensional cost.
 
@@ -77,7 +95,7 @@ and shrinks when consuming poison.
 \paragraph{Rewards.}
 Rewards are additive: gold $+r_g$, silver $+r_s$, poison $+r_p \leq 0$, death
 $r_d < 0$, and a step reward $r_{\text{step}}$. When no food is consumed, we
-add potential-based shaping:
+add potential-based shaping \cite{ng1999policy}:
 \begin{align}
 r_t \mathrel{+}= \lambda (d_{t-1} - d_t) + \mu (b_t - b_{t-1}),
 \end{align}
@@ -98,7 +116,7 @@ challenges.
 \section{Methods}
 \label{sec:methods}
 
-All agents share the same DQN training loop: $\epsilon$-greedy exploration with
+All agents share the same DQN~\cite{mnih2015human} training loop: $\epsilon$-greedy exploration with
 linear annealing, experience replay (buffer size 100\,000), and a target
 network updated every $C$ steps.
 
@@ -116,12 +134,12 @@ $C \times H \times W$ board, providing global spatial context at higher
 dimensional cost.
 
 \paragraph{DQN extensions.}
-We use \textbf{Double DQN} to reduce overestimation bias by decoupling action
+We use \textbf{Double DQN}~\cite{van2016deep} to reduce overestimation bias by decoupling action
 selection and evaluation:
 \begin{equation}
   y_t = r_t + \gamma\, Q\bigl(s_{t+1},\,\arg\max_a Q(s_{t+1}, a;\,\theta);\,\theta^-\bigr).
 \end{equation}
-We also use \textbf{Dueling networks}, decomposing $Q(s,a)$ into a state-value
+We also use \textbf{Dueling networks}~\cite{wang2016dueling}, decomposing $Q(s,a)$ into a state-value
 $V(s)$ and an advantage $A(s,a)$ as
 $Q(s,a) = V(s) + \bigl(A(s,a) - \overline{A}(s)\bigr)$, which improves learning
 in states where actions have similar value.
@@ -132,7 +150,7 @@ $(4C) \times H \times W$ tensor. This provides implicit velocity information
 for dynamic obstacles and mitigates partial observability.
 
 % ── 4. Experiments ────────────────────────────────────────────────────────────
-\section{Experiments}
+\section{Experiments and Results}
 \label{sec:exp}
 
 \subsection{Experimental Setup}
@@ -257,4 +275,8 @@ parameters to improve convergence and stability.
 We presented a comparative study of Deep Q-Network variants on a configurable Snake environment of increasing complexity. Our results show that while hand-crafted MLP agents are sufficient in simple settings, they fail to scale to more complex, dynamic environments. In contrast, CNN-based agents, particularly when combined with Double DQN, Dueling architectures, and frame stacking, demonstrate stronger performance and significantly better generalization.
 
 Overall, our findings highlight the importance of spatial representations and stabilisation techniques for solving reinforcement learning problems with rich dynamics and partial observability.
+
+\bibliographystyle{splncs04}
+\bibliography{bibliography}
+
 \end{document}
