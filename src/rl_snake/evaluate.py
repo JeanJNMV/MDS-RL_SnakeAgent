@@ -129,11 +129,6 @@ def _infer_n_frames(agent: DQNAgent | CNNDQNAgent) -> int:
     return agent.q_net.conv[0].in_channels // CNNDQNAgent.BASE_CHANNELS
 
 
-# ---------------------------------------------------------------------------
-# Rollout
-# ---------------------------------------------------------------------------
-
-
 def run_config(
     config: dict,
     agent: DQNAgent | CNNDQNAgent,
@@ -172,11 +167,6 @@ def run_config(
     return results
 
 
-# ---------------------------------------------------------------------------
-# Aggregation
-# ---------------------------------------------------------------------------
-
-
 def aggregate(config: dict, results: list[dict]) -> dict:
     lengths = [r["length"] for r in results]
     rewards = [r["total_reward"] for r in results]
@@ -198,22 +188,13 @@ def aggregate(config: dict, results: list[dict]) -> dict:
 
 
 def compute_adaptability_score(all_metrics: list[dict]) -> float:
-    """Mean normalized reward across non-baseline configs relative to baseline.
 
-    Score = 1.0 → same performance everywhere.
-    Score < 1.0 → degrades on harder envs.
-    """
     baseline = next(m for m in all_metrics if m["name"] == "baseline")
     baseline_reward = baseline["mean_reward"]
     non_baseline = [m for m in all_metrics if m["name"] != "baseline"]
     if abs(baseline_reward) < 1e-8:
         return float(np.mean([m["mean_reward"] for m in non_baseline]))
     return float(np.mean([m["mean_reward"] / baseline_reward for m in non_baseline]))
-
-
-# ---------------------------------------------------------------------------
-# Output
-# ---------------------------------------------------------------------------
 
 
 def print_summary(all_metrics: list[dict], adaptability_score: float) -> None:
@@ -277,11 +258,6 @@ def log_to_wandb(
     table = wandb.Table(columns=columns, data=rows)
     wandb.log({"adaptability_results": table, "adaptability_score": adaptability_score})
     wandb.finish()
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 
 def parse_args() -> argparse.Namespace:

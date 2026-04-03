@@ -132,12 +132,10 @@ class SnakeEnv:
 
     @property
     def length(self) -> int:
-        """Current snake length."""
         return len(self.snake)
 
     @property
     def food(self) -> tuple[int, int] | None:
-        """Backward-compat: position of the first gold food, or any food."""
         for pos, ftype in self.foods.items():
             if ftype == "gold":
                 return pos
@@ -235,7 +233,7 @@ class SnakeEnv:
             del self.foods[new_head]
             if ate_poison:
                 reward += self.poison_reward
-                # Shrink — keep at least 1 segment
+                # Shrink
                 shrink = min(self.poison_shrink, len(self.snake) - 1)
                 for _ in range(shrink):
                     self.snake.pop()
@@ -278,10 +276,6 @@ class SnakeEnv:
     def sample_action(self) -> int:
         return int(self.rng.integers(0, 4))
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
     def _sanitize_action(self, action: int) -> int:
         if self.allow_reverse:
             return action
@@ -299,7 +293,6 @@ class SnakeEnv:
         return position in body_to_check
 
     def _manhattan_to_nearest_body(self, row: int, col: int) -> float:
-        """Manhattan distance from (row, col) to the nearest body segment (excludes head)."""
         best = float("inf")
         for br, bc in self.snake[1:]:
             d = abs(br - row) + abs(bc - col)
@@ -310,7 +303,6 @@ class SnakeEnv:
     def _manhattan_to_nearest_food(
         self, row: int, col: int, food_types: tuple[str, ...] = ("gold", "silver")
     ) -> float:
-        """Distance to nearest food of the given types (ignores poison by default)."""
         best = float("inf")
         for pos, ftype in self.foods.items():
             if ftype in food_types:
@@ -320,7 +312,6 @@ class SnakeEnv:
         return best if best != float("inf") else 0.0
 
     def _dynamic_obstacle_swept_cells(self) -> set[tuple[int, int]]:
-        """All cells in rows/columns where dynamic obstacles travel (forbidden for food)."""
         blocked: set[tuple[int, int]] = set()
         for r, c, _d, ori, _phase in self.dynamic_obstacles:
             if ori == "h":
@@ -330,7 +321,12 @@ class SnakeEnv:
         return blocked
 
     def _spawn_food(self, food_type: str) -> None:
-        occupied = set(self.snake) | self.all_obstacle_positions | set(self.foods) | self._dynamic_obstacle_swept_cells()
+        occupied = (
+            set(self.snake)
+            | self.all_obstacle_positions
+            | set(self.foods)
+            | self._dynamic_obstacle_swept_cells()
+        )
         free = [(r, c) for r in range(self.height) for c in range(self.width) if (r, c) not in occupied]
         if not free:
             if not self.foods:
@@ -340,14 +336,12 @@ class SnakeEnv:
         self.foods[free[idx]] = food_type
 
     def _spawn_rand_obstacles(self) -> None:
-        """Randomly place n_rand_obstacles single-cell obstacles each episode."""
         occupied = set(self.snake) | self.obstacles | set(self.foods)
         free = [(r, c) for r in range(self.height) for c in range(self.width) if (r, c) not in occupied]
         indices = self.rng.permutation(len(free))
         self._rand_obstacles = {free[int(i)] for i in indices[: self.n_rand_obstacles]}
 
     def _spawn_dynamic_obstacles(self) -> None:
-        """Spawn wall segments of 3 cells. Vertical walls move UP/DOWN, horizontal LEFT/RIGHT."""
         occupied = set(self.snake) | self.obstacles | self._rand_obstacles | set(self.foods)
 
         for _ in range(self.n_dynamic_obstacles):
@@ -393,10 +387,8 @@ class SnakeEnv:
                 occupied.update((r, c + i) for i in range(3))
 
     def _move_dynamic_obstacles(self) -> None:
-        """Move each wall obstacle 1 step in its direction, then back — pure oscillation."""
         for obs in self.dynamic_obstacles:
             r, c, d, ori, phase = obs
-            # phase 0 → move in direction d; phase 1 → move back
             move_dir = d if phase == 0 else _OPPOSITE[d]
             dr, dc = self.ACTION_TO_DELTA[move_dir]
             obs[0] += dr

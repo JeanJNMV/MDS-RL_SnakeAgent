@@ -30,10 +30,7 @@ def _is_dangerous(env: SnakeEnv, pos: tuple[int, int]) -> bool:
     return pos in env.snake[:-1]
 
 
-def _nearest_food_of_type(
-    env: SnakeEnv, food_types: tuple[str, ...]
-) -> tuple[int, int] | None:
-    """Return the position of the nearest food matching any of the given types."""
+def _nearest_food_of_type(env: SnakeEnv, food_types: tuple[str, ...]) -> tuple[int, int] | None:
     hr, hc = env.snake[0]
     best_pos = None
     best_dist = float("inf")
@@ -78,8 +75,8 @@ def get_state(env: SnakeEnv) -> np.ndarray:
         return (hr + dr, hc + dc)
 
     danger_straight = float(_is_dangerous(env, ahead(d)))
-    danger_right    = float(_is_dangerous(env, ahead(_TURN_RIGHT[d])))
-    danger_left     = float(_is_dangerous(env, ahead(_TURN_LEFT[d])))
+    danger_right = float(_is_dangerous(env, ahead(_TURN_RIGHT[d])))
+    danger_left = float(_is_dangerous(env, ahead(_TURN_LEFT[d])))
 
     # Nearest positive food (gold or silver) — falls back to head if none exists
     pos_food = _nearest_food_of_type(env, ("gold", "silver")) or (hr, hc)
@@ -99,14 +96,14 @@ def get_state(env: SnakeEnv) -> np.ndarray:
             float(d == RIGHT),
             float(d == DOWN),
             float(d == LEFT),
-            float(fr < hr),                      # positive food above
-            float(fr > hr),                      # positive food below
-            float(fc < hc),                      # positive food left
-            float(fc > hc),                      # positive food right
-            float(has_poison and pr < hr),        # poison above
-            float(has_poison and pr > hr),        # poison below
-            float(has_poison and pc < hc),        # poison left
-            float(has_poison and pc > hc),        # poison right
+            float(fr < hr),  # positive food above
+            float(fr > hr),  # positive food below
+            float(fc < hc),  # positive food left
+            float(fc > hc),  # positive food right
+            float(has_poison and pr < hr),  # poison above
+            float(has_poison and pr > hr),  # poison below
+            float(has_poison and pc < hc),  # poison left
+            float(has_poison and pc > hc),  # poison right
         ],
         dtype=np.float32,
     )
@@ -139,10 +136,6 @@ def get_window_state(env: SnakeEnv, half_size: int = 5) -> np.ndarray:
 
     Out-of-bounds cells are treated as obstacles (channel 5 = 1).
     Same channel convention as get_grid_state.
-
-    Args:
-        env: SnakeEnv instance (after reset).
-        half_size: cells on each side of the head; window side = 2*half_size+1.
     """
     obs = env._get_observation()  # (H, W) int8, values 0-6
     H_env, W_env = obs.shape
@@ -159,8 +152,9 @@ def get_window_state(env: SnakeEnv, half_size: int = 5) -> np.ndarray:
     # Head in padded coordinates
     hr, hc = env.snake[0]
     pr, pc = hr + half_size, hc + half_size
-    window_raw = padded[pr - half_size : pr + half_size + 1,
-                        pc - half_size : pc + half_size + 1]  # (win, win)
+    window_raw = padded[
+        pr - half_size : pr + half_size + 1, pc - half_size : pc + half_size + 1
+    ]  # (win, win)
 
     result = np.zeros((6, win, win), dtype=np.float32)
     result[0] = window_raw == 1  # body
@@ -178,22 +172,12 @@ def get_window_state(env: SnakeEnv, half_size: int = 5) -> np.ndarray:
 
 
 class FrameStack:
-    """Stacks the last n_frames observations into a single state array.
-
-    For the CNN agent: (6, H, W) per frame → (6*n_frames, H, W) stacked.
-    For the MLP agent: (15,) per frame     → (15*n_frames,) concatenated.
-
-    With n_frames=1 (default) the output is identical to a single frame,
-    so all existing code paths are unaffected.
-    """
-
     def __init__(self, n_frames: int, state_fn) -> None:
         self.n_frames = n_frames
         self.state_fn = state_fn
         self._frames: deque = deque(maxlen=n_frames)
 
     def reset(self, env: SnakeEnv) -> np.ndarray:
-        """Call at the start of every episode to fill the buffer with the first frame."""
         obs = self.state_fn(env)
         self._frames.clear()
         for _ in range(self.n_frames):
@@ -201,7 +185,6 @@ class FrameStack:
         return self._stacked()
 
     def step(self, env: SnakeEnv) -> np.ndarray:
-        """Call after every env.step() to push the new frame and return the stack."""
         self._frames.append(self.state_fn(env))
         return self._stacked()
 
@@ -280,8 +263,6 @@ class BaseAgent(ABC):
 
 
 class _QNetwork(nn.Module):
-    """MLP Q-network with optional dueling architecture."""
-
     def __init__(
         self,
         state_dim: int,
@@ -301,26 +282,20 @@ class _QNetwork(nn.Module):
 
         if dueling:
             self.value_head = nn.Linear(in_dim, 1)
-            self.adv_head   = nn.Linear(in_dim, n_actions)
+            self.adv_head = nn.Linear(in_dim, n_actions)
         else:
             self.out = nn.Linear(in_dim, n_actions)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.trunk(x)
         if self.dueling:
-            v = self.value_head(x)               # (B, 1)
-            a = self.adv_head(x)                 # (B, n_actions)
+            v = self.value_head(x)  # (B, 1)
+            a = self.adv_head(x)  # (B, n_actions)
             return v + a - a.mean(dim=1, keepdim=True)
         return self.out(x)
 
 
 class _CNNQNetwork(nn.Module):
-    """CNN Q-network with optional dueling architecture.
-
-    Operates on a stacked grid observation of shape (in_channels, H, W).
-    With n_frames=1: in_channels=6. With n_frames=4: in_channels=24.
-    """
-
     def __init__(
         self,
         height: int,
@@ -350,7 +325,7 @@ class _CNNQNetwork(nn.Module):
 
         if dueling:
             self.value_head = nn.Linear(in_dim, 1)
-            self.adv_head   = nn.Linear(in_dim, n_actions)
+            self.adv_head = nn.Linear(in_dim, n_actions)
         else:
             self.out = nn.Linear(in_dim, n_actions)
 
@@ -376,8 +351,6 @@ _OPTIMIZERS = {
 
 
 class _BaseDQNAgent(BaseAgent):
-    """Shared DQN training logic. Subclasses provide the Q-network architecture."""
-
     N_ACTIONS = 4
 
     def __init__(
@@ -446,11 +419,11 @@ class _BaseDQNAgent(BaseAgent):
 
         states, actions, rewards, next_states, dones = self.buffer.sample(self.batch_size)
 
-        s  = torch.tensor(states,      device=self.device)
-        a  = torch.tensor(actions,     device=self.device)
-        r  = torch.tensor(rewards,     device=self.device)
+        s = torch.tensor(states, device=self.device)
+        a = torch.tensor(actions, device=self.device)
+        r = torch.tensor(rewards, device=self.device)
         s_ = torch.tensor(next_states, device=self.device)
-        d  = torch.tensor(dones,       device=self.device)
+        d = torch.tensor(dones, device=self.device)
 
         q_values = self.q_net(s).gather(1, a.unsqueeze(1)).squeeze(1)
 
@@ -475,13 +448,11 @@ class _BaseDQNAgent(BaseAgent):
 
         self._steps += 1
         if self.target_tau is not None:
-            # Soft (Polyak) update every step: θ_target ← τ·θ_online + (1-τ)·θ_target
             for p_online, p_target in zip(self.q_net.parameters(), self.target_net.parameters(), strict=True):
                 p_target.data.copy_(
                     self.target_tau * p_online.data + (1.0 - self.target_tau) * p_target.data,
                 )
         elif self._steps % self.target_update_freq == 0:
-            # Hard update
             self.target_net.load_state_dict(self.q_net.state_dict())
 
         return loss.item()
@@ -507,22 +478,7 @@ class _BaseDQNAgent(BaseAgent):
         self._steps = ckpt["steps"]
 
 
-# ---------------------------------------------------------------------------
-# Concrete agents
-# ---------------------------------------------------------------------------
-
-
 class DQNAgent(_BaseDQNAgent):
-    """DQN agent with a fully-connected MLP on the 15-feature state vector.
-
-    With n_frames=1 (default): input dim = 15.
-    With n_frames=N:           input dim = 15 * N (last N feature vectors stacked).
-
-    Backward compat: on the simple env (no silver/poison/obstacles) features
-    [11-14] are always 0, so the agent behaves identically to the old 11-feature
-    version (the extra zeros are ignored by the network).
-    """
-
     BASE_STATE_DIM = 15
 
     def __init__(
@@ -566,12 +522,6 @@ class DQNAgent(_BaseDQNAgent):
 
 
 class CNNDQNAgent(_BaseDQNAgent):
-    """DQN agent with a CNN on the stacked grid observation.
-
-    With n_frames=1 (default): input channels = 6.
-    With n_frames=N:           input channels = 6 * N.
-    """
-
     BASE_CHANNELS = 6
 
     def __init__(

@@ -308,7 +308,7 @@ def train(args: argparse.Namespace) -> None:
         )
 
     wandb.finish()
-    print(f"Training complete. Final checkpoint → {final_path}")
+    print(f"Training complete. Final checkpoint : {final_path}")
 
 
 def _save_checkpoint_video(
