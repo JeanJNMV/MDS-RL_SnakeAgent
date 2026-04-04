@@ -20,3 +20,4 @@ checkpoints
 deliverables/poster/*
 deliverables/report/*
 !deliverables/report/report.tex
+!deliverables/report/bibliography.bib
